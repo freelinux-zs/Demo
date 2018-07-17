@@ -3,13 +3,13 @@
 
 
 
-static int hello_init(void)
+static int __init hello_init(void)
 {
 	printk("hello world enter\r\n");
 	return 0;
 }
 
-static void hello_exit(void)
+static void __exit hello_exit(void)
 {
 	printk("hello world exit\n");
 }
