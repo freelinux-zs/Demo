@@ -97,3 +97,47 @@
 
 		2.3	关闭
 			fclose(FILE *stream);
+	
+	三：Linux文件系统和驱动设备
+		3.1 查看/proc/devices文件可以获取系统中注册的设备。第一列为主设备号，第2列为次设备号
+		3.2 查看/dev目录可以获知系统包含的设备文件，日期的前两列给出了对应设备的主从设备号
+		3.3 在linux内核中，分别使用bus_type, device_driver和drvice来描述总线，驱动和设备。三个的结构体定义在include/linux/device.h
+
+4.字符设备
+	4.1 cdev结构体
+		获取主从设备号:MAJOR(dev_t dev)  MINOR(dev_t dev)
+		生成主从设备号：MKDEV(int major, int minor)
+
+	4.2 虚拟文件接口：
+		void cdev_init(struct cdev *, struct file_operations *);
+		struct cdev *cdev_alloc(void);
+		void cdev_put(struct cdev *p);
+		int cdev_add(struct cdev *, dev_t , unsigned);
+		void cdev_del(struct cdev *);
+
+		cdev_init()函数用于初始化cdev成员，并建立cdev和file_operations之间的连接。
+		cdev_alloc()用于动态申请一个cdev内存。
+		cdev_add和cdev_del分别向系统贴加和删除一个cdev.完成字符设备的注册和注销。
+
+	4.3 分配和释放设备号
+		在调用cdev_add,函数向系统注册字符设备之前，应首先调用register_chrdev_region()或alloc_chrdev_region()函数向系统申请设备号。
+
+	4.4 file_operations结构体：
+		主要成员分析：
+			1.llseek()函数用来修改一个文件的当前读写位置，并将新位置返回，在出错时，这个函数返回一个负值。
+			2.read函数用来从设备读取数据。
+			3.write函数向设备发送数据。
+			4.readdir函数仅用于目录，设备节点不需要实现。
+			5.ioctl提供设备相关的控制命令。
+			6.mmap将设备内存映射到进程内存中，如果驱动设备为实现，用户进行mmap将返回错误。帧缓冲设备特别有意义。
+			7.poll一般用于询问是否可被非阻塞地立即读写。当询问的条件未触发时，用户空间进行select()和poll()系统调用将引起进程的阻塞。
+			8.aio_read和aio_write函数分别对与文件描述符对应的设备进行异步读，写操作，设备实现这两个函数后，用户空间可以对该设备文件描述符调用aio_read, aio_write等系统调用进行读写。
+
+	4.5 内核空间和用户空间的拷贝
+			unsigned long copy_from_user(void *to, const void __user *from, unsigned long count);
+			unsigned long copy_to_user(void __user *to, const void *from, unsigned long count);
+
+	4.6 复制内存的简单字符
+			get_user(val, (int *)arg);
+			put_user(val, (int *)arg);
+
