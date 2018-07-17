@@ -1,11 +1,13 @@
 #include <linux/init.h>
 #include <linux/module.h>
 
-
+extern int add_integar(int a, int b);
+extern int sub_integar(int a, int b);
 
 static int __init hello_init(void)
 {
-	printk("hello world enter\r\n");
+	
+	printk("hello world enter :%d\r\n", add_integar(1,2));
 	return 0;
 }
 
