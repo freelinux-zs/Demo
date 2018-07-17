@@ -69,4 +69,31 @@
 	5.关闭
 		int close(int fd);
 
+	二：C库的使用。
+		2.1创建和打开
+			FILE *fopen(const char *path, const char *mode);
+				mode:
+					r,rb		以只读方式
+					w,wb		以只写方式打开，如果文件不存在则创建该文件，否则文件被截断
+					a,ab		以追加方式打开，如果文件不存在，则创建该文件
+					r+,r+b,rb+	以读写方式打开
+					w+,w+b,wh+	以读写方式打开，如果文件不存在，创建新文件，否则文件被截断
+					a+,a+b,ab+	以读和追加方式打开。如果文件不在，则创建新文件。
 
+		2.2 读写
+			int fgetc(FILE *stream);
+			int fputc(int c, FILE *stream);
+			char *fgets(char *s, int n, FILE *stream);
+			int fputs(const char *s, FILE *stream);
+			int fprintf(FILE);
+			int fscanf(FILE stream, const char format, ...);
+			size_t fread(void *ptr, size_t size, size_t n, FILE *stream);
+			size_t fwrite(const void *ptr, size_t size, size_t n, FILE *stream);
+
+			定位函数：
+				int fgetpos(FILE *stream, fpos_t *pos);
+				int fsetpos(FILE *stream, const fpos_t *pos);
+				int fseek(FILE *stream, long offset, int whence);
+
+		2.3	关闭
+			fclose(FILE *stream);
