@@ -21,6 +21,7 @@ static int globalmem_major = 0;//GLOBALMEM_MAJOR;
 struct globalmem_dev {
 	struct cdev cdev;
 	unsigned char mem[GLOBALMEM_SIZE];
+	struct semaphore sem; /*并发控制信号量*/
 };
 
 struct globalmem_dev *globalmem_devp;  /*设备结构体实列*/
@@ -54,6 +55,9 @@ static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size, 
 	if (count > GLOBALMEM_SIZE - p) //要读的字节数太大
 		count = GLOBALMEM_SIZE - p;
 
+	if (down_interruptible(&dev->sem)) /*获取信号量*/
+		return  - ERESTARTSYS;
+
 	/*内核空间---->用户空间*/
 	if (copy_to_user(buf, (void *)(dev->mem +p), count))
 		ret = - EFAULT;
@@ -63,6 +67,8 @@ static ssize_t globalmem_read(struct file *filp, char __user *buf, size_t size, 
 
 		printk(KERN_INFO "read %d byte(s) form %ld\n",count, p);
 	}
+
+	up(&dev->sem);
 
 	return ret;
 }
@@ -81,6 +87,8 @@ static ssize_t globalmem_write(struct file *filp, const char __user *buf, size_t
 	if (count > GLOBALMEM_SIZE - p)
 		count = GLOBALMEM_SIZE - p;
 
+	if (down_interruptible(&dev->sem)) /*获取信号量*/
+		return  - ERESTARTSYS; 
 	/*用户空间----->内核空间*/
 	if (copy_from_user(dev->mem + p, buf, count))
 		ret = - EFAULT;
@@ -90,6 +98,8 @@ static ssize_t globalmem_write(struct file *filp, const char __user *buf, size_t
 
 		printk(KERN_INFO "Written %d byte(s) from %ld\n",count, p);
 	}
+
+	up(&dev->sem); 
 
 	return ret;
 }
@@ -141,7 +151,14 @@ static long globalmem_ioctl(struct file *filp, unsigned int cmd, unsigned long a
 
 	switch (cmd) {
 		case MEM_CLEAR:
+
+			if (down_interruptible(&dev->sem)) /*获得信号量*/
+				return - ERESTARTSYS;
+
 			memset(dev->mem, 0, GLOBALMEM_SIZE);
+
+			up(&dev->sem); /*释放信号量*/
+
 			printk(KERN_INFO "globalmem is set to ZERO\n");
 			break;
 
@@ -207,7 +224,8 @@ static int __init globalmem_init(void)
 
 	globalmem_setup_cdev(&globalmem_devp[0], 0);
 	globalmem_setup_cdev(&globalmem_devp[1], 1);
-
+//	init_MUTEX(&globalmem_devp->sem); /*初始化信号量*/
+	sema_init(&globalmem_devp->sem, 1);
 	return 0;
 
 fail_malloc:
