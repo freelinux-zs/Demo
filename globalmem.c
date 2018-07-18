@@ -15,7 +15,7 @@
 #define GLOBALMEM_MAJOR     250		/*预设的globalmem的主设备号*/
 
 
-static int globalmem_major = GLOBALMEM_MAJOR;
+static int globalmem_major = 0;//GLOBALMEM_MAJOR;
 
 /*globalmem 设备结构体*/
 struct globalmem_dev {
@@ -27,7 +27,11 @@ struct globalmem_dev *globalmem_devp;  /*设备结构体实列*/
 
 static int globalmem_open(struct inode *inode, struct file *filp)
 {
-	filp->private_data = globalmem_devp;
+	struct globalmem_dev *dev;
+
+	dev = container_of(inode->i_cdev, struct globalmem_dev, cdev);
+
+	filp->private_data = dev;
 
 	return 0;
 }
@@ -181,10 +185,10 @@ static int __init globalmem_init(void)
 
 	/*申请字符设备驱动区域*/
 	if(globalmem_major)
-		result = register_chrdev_region(devno, 1, "globalmem");
+		result = register_chrdev_region(devno, 2, "globalmem");
 	else{
 		/*动态获得主设备号*/
-		result = alloc_chrdev_region(&devno, 0, 1, "globalmem");
+		result = alloc_chrdev_region(&devno, 0, 2, "globalmem");
 		globalmem_major = MAJOR(devno);
 	}
 
@@ -192,16 +196,17 @@ static int __init globalmem_init(void)
 		return result;
 
 	/*动态申请设备结构体内存*/
-	globalmem_devp = kmalloc(sizeof(struct globalmem_dev), GFP_KERNEL);
+	globalmem_devp = kmalloc(2 * sizeof(struct globalmem_dev), GFP_KERNEL);
 
 	if (!globalmem_devp) {/*申请失败*/
 		goto fail_malloc;
 	}
 
 
-	memset(globalmem_devp, 0, sizeof(struct globalmem_dev));
+	memset(globalmem_devp, 0, 2 * sizeof(struct globalmem_dev));
 
-	globalmem_setup_cdev(globalmem_devp, 0);
+	globalmem_setup_cdev(&globalmem_devp[0], 0);
+	globalmem_setup_cdev(&globalmem_devp[1], 1);
 
 	return 0;
 
@@ -212,9 +217,11 @@ fail_malloc:
 
 static void __exit globalmem_exit(void)
 {
-	cdev_del(&globalmem_devp->cdev); //删除cdev 结构
+	//cdev_del(&globalmem_devp->cdev); //删除cdev 结构
+	cdev_del(&(globalmem_devp[0].cdev));
+	cdev_del(&(globalmem_devp[1].cdev));
 	kfree(globalmem_devp);
-	unregister_chrdev_region(MKDEV(globalmem_major, 0), 1); //注销设备区域
+	unregister_chrdev_region(MKDEV(globalmem_major, 0), 2); //注销设备区域
 }
 
 module_init(globalmem_init);
