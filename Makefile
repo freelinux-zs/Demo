@@ -1,8 +1,9 @@
 KVERS = $(shell uname -r)
 
 #kernel modules
-obj-m += hello.o
-obj-m += exported_symbols.o
+#obj-m += hello.o
+#obj-m += exported_symbols.o
+obj-m += globalmem.o
 #Specify flags for the module compilation
 #EXTRA_CFLAGS=-g -O0
 
