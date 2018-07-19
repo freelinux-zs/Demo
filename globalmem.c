@@ -9,7 +9,7 @@
 #include <asm/io.h>
 #include <linux/slab.h>
 #include <asm/uaccess.h>
-
+#include <linux/device.h>
 #define GLOBALMEM_SIZE		0X1000  /*全局内存大小：4KB*/
 #define MEM_CLEAR			0x1     /*清零全局内存*/
 #define GLOBALMEM_MAJOR     250		/*预设的globalmem的主设备号*/
@@ -17,9 +17,13 @@
 
 static int globalmem_major = 0;//GLOBALMEM_MAJOR;
 
+
 /*globalmem 设备结构体*/
 struct globalmem_dev {
 	struct cdev cdev;
+	struct class *test_class;
+	struct device *test_nor_device;
+	struct device *accdet_nor_device;
 	unsigned char mem[GLOBALMEM_SIZE];
 	struct semaphore sem; /*并发控制信号量*/
 };
@@ -188,10 +192,17 @@ static void globalmem_setup_cdev(struct globalmem_dev *dev, int index)
 	cdev_init(&dev->cdev, &globalmem_fops);
 	dev->cdev.owner = THIS_MODULE;
 	err = cdev_add(&dev->cdev, devno, 1);
-
 	if (err)
 		printk(KERN_NOTICE "Error %d adding globalmem",err);
+
+	globalmem_devp->test_class = class_create(THIS_MODULE, "globalmem02");  
+	if(IS_ERR(globalmem_devp->test_class)) {
+		printk("Err: failed in creating class./n");
+	}
+
+	globalmem_devp->test_nor_device = device_create(globalmem_devp->test_class, NULL, devno, NULL, "globalmem01");
 }
+
 
 /*globalmem设备驱动模块加载函数*/
 static int __init globalmem_init(void)
@@ -236,10 +247,14 @@ fail_malloc:
 static void __exit globalmem_exit(void)
 {
 	//cdev_del(&globalmem_devp->cdev); //删除cdev 结构
+	device_del(globalmem_devp->test_nor_device);
+	class_destroy(globalmem_devp->test_class);
 	cdev_del(&(globalmem_devp[0].cdev));
 	cdev_del(&(globalmem_devp[1].cdev));
+	
 	kfree(globalmem_devp);
 	unregister_chrdev_region(MKDEV(globalmem_major, 0), 2); //注销设备区域
+	printk("globalmem_exit\n");
 }
 
 module_init(globalmem_init);
