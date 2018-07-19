@@ -361,4 +361,46 @@
 		void __sched mutex_unlock(struct mutex *lock);
 
 
+6 阻塞与非阻塞
+	阻塞操作是指在执行设备操作时，若不能获得资源，则挂起进程直到满足可操作的条件后再
+	进行操作。被挂起的进程进入休眠状态，被从调度器的运行队列移走，直到等待的条件被满足。
+	而非阻塞操作的进程在不能进行设备操作时，并不挂起，它或者放弃，或者不停地查询，直至可
+	以进行操作为止。
+	6.1 等待队列
+		1.定义“等待队列头”
+			wait_queue_head_t my_queue;
+		2.初始化“等待队列头”
+			init_waitqueue_head(&my_queue);
+			DECLARE_WAIT_QUEUE_HEAD (name)
+		3.定义等待队列
+			DECLARE_WAITQUEUE(name, tsk)
+		4. 添加/移除等待队列
+			void fastcall add_wait_queue(wait_queue_head_t *q, wait_queue_t *wait);
+			void fastcall remove_wait_queue(wait_queue_head_t *q, wait_queue_t *wait);
+		5.等待事件
+			wait_event(queue, condition)
+			wait_event_interruptible(queue, condition)
+			wait_event_timeout(queue, condition, timeout)
+			wait_event_interruptible timeout(queue, condition, timeout)
+
+				wait_event()和wait_event_interruptible()的区别在于后者可以被信号打断，而
+				前者不能。加上_timeout 后的宏意味着阻塞等待的超时时间，以jiffy 为单位，在第3 个参数的timeout
+				到达时，不论condition 是否满足，均返回。
+		6.唤醒队列
+			void wake_up(wait_queue_head_t *queue);
+			void wake_up_interruptible(wait_queue_head_t *queue);
+
+				wake_up()应该与wait_event()或wait_event_timeout()成对使用，而wake_up_interruptible()
+				则应与wait_event_interruptible()或wait_event_interruptible_timeout()成对使用。wake_up()可唤醒
+				处于TASK_INTERRUPTIBLE 和TASK_UNINTERRUPTIBLE 的进程，而wake_up_interruptible()
+				只能唤醒处于TASK_INTERRUPTIBLE 的进程。
+		7.在等待队列上睡眠
+			sleep_on(wait_queue_head_t *q );
+			interruptible_sleep_on(wait_queue_head_t *q );
+
+			interruptible_sleep_on()与sleep_on()函数类似，其作用是将目前进程的状态置成TASK_
+			INTERRUPTIBLE，并定义一个等待队列，之后把它附属到等待队列头q，直到资源可获得，q 引导
+			的等待队列被唤醒或者进程收到信号
+
+
 
