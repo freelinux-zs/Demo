@@ -403,4 +403,78 @@
 			的等待队列被唤醒或者进程收到信号
 
 
+7.中断
+	7.1 Linux 实现底半部的机制主要有tasklet、工作队列和软中断。
+		7.1.1 tasklet
+			tasklet 的使用较简单，我们只需要定义tasklet 及其处理函数并将两者关联.
+			代码DECLARE_TASKLET(my_tasklet,my_tasklet_func,data)实现了定义名称为my_tasklet 的tasklet 并将其与my_tasklet_func()这个函数绑定，而传入这个函数的参数为data。
 
+			tasklet_schedule(&my_tasklet);
+
+		7.1.2 软中断
+			软中断（softirq）也是一种传统的底半部处理机制，它的执行时机通常是顶半部返回的时候，tasklet 是基于软中断实现的，因此也运行于软中断上下文。
+
+			软中断和tasklet 运行于软中断上下文，仍然属于原子上下文的一种，而工作队列则运行于进程上下文。因此，软中断和tasklet 处理函数中不能睡眠，而工作队列处理函数中允许睡眠。
+
+			local_bh_disable()和local_bh_enable()是内核中用于禁止和使能软中断和tasklet 底半部机制的函数.
+
+		7.1.3 共享中断
+			1. 共享中断的多个设备在申请中断时，都应该使用IRQF_SHARED 标志，而且一个设备以IRQF_SHARED 申请某中断成功的前提是该中断未被申请，或该中断虽然被申请了，但是之前申请该中断的所有设备也都以IRQF_SHARED 标志申请该中断。
+			2.尽管内核模块可访问的全局地址都可以作为request_irq(…,void *dev_id)的最后一个参数dev_id，但是设备结构体指针显然是可传入的最佳参数。
+			3.在中断到来时，会遍历执行共享此中断的所有中断处理程序，直到某一个函数返回IRQ_HANDLED。在中断处理程序顶半部中，应迅速地根据硬件寄存器中的信息比照传入的dev_id 参数判断是否是本设备的中断，若不是，应迅速返回IRQ_NONE，
+
+	7.2 内核定时器
+		软件意义上的定时器最终依赖硬件定时器来实现。
+		1.timer_list
+			struct timer_list my_timer;
+		2.初始化定时器
+			void init_timer(struct timer_list * timer);
+		3.增加定时器
+			void add_timer(struct timer_list * timer);
+		4.删除定时器
+			int del_timer(struct timer_list * timer);
+		5.修改定时器的expire
+			int mod_timer(struct timer_list *timer, unsigned long expires);
+
+	7.3 内核中延迟的工作delayed_work
+		int schedule_delayed_work(struct delayed_work *work, unsigned long delay);
+			work_func_t 类型定义为：typedef void (*work_func_t)(struct work_struct *work);
+			schedule_delayed_work(&work, msecs_to_jiffies(poll_interval));
+
+			其中的msecs_to_jiffies()用于将毫秒转化为jiffies。
+
+			如下函数用来取消delayed_work：
+			int cancel_delayed_work(struct delayed_work *work);
+			int cancel_delayed_work_sync(struct delayed_work *work);
+	
+	7.4 内核延时
+		1. 短延时
+			void ndelay(unsigned long nsecs);
+			void udelay(unsigned long usecs);
+			void mdelay(unsigned long msecs);
+
+			毫秒时延（以及更大的秒时延）已经比较大了，在内核中，最好不要直接使用mdelay()函数，这将无谓地耗费CPU 资源，对于毫秒级以上时延，内核提供了下述函数：
+			void msleep(unsigned int millisecs);
+			unsigned long msleep_interruptible(unsigned int millisecs);
+			void ssleep(unsigned int seconds);
+
+			上述函数将使得调用它的进程睡眠参数指定的时间，msleep()、ssleep()不能被打断，而msleep_interruptible()则可以被打断。
+
+		2.长延时
+			unsigned long delay = jiffies + 100;
+		    while (time_before(jiffies, delay));
+			
+			unsigned long delay = jiffies + 2*Hz;
+			while (time_before(jiffies, delay));
+
+		3.睡着延时
+			schedule_timeout()可以使当前任务睡眠指定的jiffies 之后重新被调度执行，msleep()和msleep_interruptible()在本质上都是依靠包含了schedule_timeout()的schedule_timeout_uninterruptible
+
+8 Linux设备驱动
+	
+
+9.Linux块设备。
+	字符设备与块设备I/O 操作的不同如下。
+	1.块设备只能以块为单位接受输入和返回输出，而字符设备则以字节为单位。大多数设备是字符设备，因为它们不需要缓冲而且不以固定块大小进行操作
+	2.块设备对于I/O 请求有对应的缓冲区，因此它们可以选择以什么顺序进行响应，字符设备无须缓冲且被直接读写。对于存储设备而言调整读写的顺序作用巨大，因为在读写连续的扇区比分离的扇区更快
+	3.字符设备只能被顺序读写，而块设备可以随机访问。虽然块设备可随机访问，但是对于磁盘这类机械设备而言，顺序地组织块设备的访问可以提高性能对扇区1、10、3、2的请求被调整为对扇区1、2、3、10的请求。而对SD卡、RamDisk 				  等块设备而言，不存在机械上的原因，进行这样的调整没有必要。
