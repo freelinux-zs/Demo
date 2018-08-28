@@ -11,6 +11,7 @@
 #include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/miscdevice.h>
+#include <linux/mutex.h>
 
 #include "nsl_ctps.h"
 
@@ -25,6 +26,7 @@ typedef struct {
 	struct delayed_work x_work;
 	struct device *nsl_device;
 	struct input_dev *nsl_input_dev;
+	struct mutex lock;
 	bool run_ppg;
 	ppg_data_t ppg_data;
 }nsl_data_t;
@@ -40,7 +42,7 @@ static ssize_t nsl_enable_store(struct device* dev,
 	{
 		printk("Enable!!\n");		
 		nsldata.run_ppg = true;
-		schedule_delayed_work(&nsldata.x_work, msecs_to_jiffies(100));
+//		schedule_delayed_work(&nsldata.x_work, msecs_to_jiffies(100));
 	}
 	else
 	{
@@ -52,11 +54,16 @@ static ssize_t nsl_enable_store(struct device* dev,
 
 static ssize_t nsl_enable_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
-	
+	int rawdata[2] = {0};
+	mutex_lock(&nsldata.lock);
+	rawdata[0] = 4;
+	rawdata[1] = 55;
+	mutex_unlock(&nsldata.lock);
 	//cat rw_reg	
 	printk("%s (%d) \n", __func__, __LINE__);
+	
+	return sprintf(buf,"%d,%d",rawdata[0],rawdata[1]);
 
-	return 0; 
 }
 
 
@@ -110,86 +117,6 @@ static int nsl_delete_attr(struct device *dev)
 } 
 
 /*--------------------------------------------*/
-
-static void nsl_report_data(void)
-{
-	if(nsldata.run_ppg)	
-	{
-		printf(">>>%s (%d)\n",__func__,__LINE__);
-		nsldata.ppg_data.NSL_Data[0] = 12.31;
-		nsldata.ppg_data.NSL_Data[1] = 1121;
-		nsldata.ppg_data.NSL_Data[2] = 55.66;
-		input_report_abs(nsldata.nsl_input_dev, ABS_X, *(uint32_t *)(nsldata.ppg_data.NSL_Data));
-		input_report_abs(nsldata.nsl_input_dev, ABS_Y, *(uint32_t *)(nsldata.ppg_data.NSL_Data + 1));
-		input_report_abs(nsldata.nsl_input_dev, ABS_Z, *(uint32_t *)(nsldata.ppg_data.NSL_Data + 2));
-		input_sync(nsldata.nsl_input_dev);		
-		
-	}
-}
-
-
-
-static void nsl_x_work_func(struct work_struct *work)
-{
-	printk(">>>%s (%d)\n", __func__, __LINE__);
-//	while(nsldata.run_ppg)
-	{
-		nsl_report_data();
-	}	
-}
-
-
-static int nsl_input_open(struct input_dev *dev)
-{
-	printk(">>> %s (%d) \n", __func__, __LINE__);
-	return 0;
-}
-
-static void nsl_input_close(struct input_dev *dev)
-{
-	printk(">>> %s (%d) \n", __func__, __LINE__);
-}
-
-
-static int nsl_init_input_data(void)
-{
-	int ret = 0;
-
-	printk("%s (%d) : initialize data\n", __func__, __LINE__);
-	
-	nsldata.nsl_input_dev = input_allocate_device();
-	
-	if (!nsldata.nsl_input_dev) {
-		printk("%s (%d) : could not allocate mouse input device\n", __func__, __LINE__);
-		return -ENOMEM;
-	}
-	nsldata.nsl_input_dev->evbit[0] = BIT_MASK(EV_ABS);
-	nsldata.nsl_input_dev->absbit[0] = BIT_MASK(ABS_X) | BIT_MASK(ABS_Y)| BIT_MASK(ABS_Z)| BIT_MASK(ABS_RX) | BIT_MASK(ABS_RY);
-
-	input_abs_set_max(nsldata.nsl_input_dev, ABS_X, 0xffffffff);
-	input_abs_set_max(nsldata.nsl_input_dev, ABS_Y, 0xffffffff);
-	input_abs_set_max(nsldata.nsl_input_dev, ABS_Z, 0xffffffff);
-	input_abs_set_max(nsldata.nsl_input_dev, ABS_RX, 0xffffffff);
-	input_abs_set_max(nsldata.nsl_input_dev, ABS_RY, 0xffffffff);
-
-	input_set_drvdata(nsldata.nsl_input_dev, &nsldata);
-	nsldata.nsl_input_dev->name = "NSL ctps5.5";	
-
-	nsldata.nsl_input_dev->open = nsl_input_open;
-	nsldata.nsl_input_dev->close = nsl_input_close;
-	
-	ret = input_register_device(nsldata.nsl_input_dev);
-	if (ret < 0) {
-		input_free_device(nsldata.nsl_input_dev);
-		printk("%s (%d) : could not register input device\n", __func__, __LINE__);	
-		return ret;
-	}
-	
-	return 0;	
-}
-
-
-
 
 /********************************************/
 static ssize_t nsl_read(struct file *filp, char *buf, size_t count, loff_t *l)
@@ -255,15 +182,9 @@ static int __init nslctps_init(void)
 		return err;
 	}  
 
-	INIT_DELAYED_WORK(&nsldata.x_work, nsl_x_work_func);
-
-	err = nsl_init_input_data();
-	if (err < 0) {
-		return err;
-	}
 
 	nsldata.run_ppg = false;
-
+	mutex_init(&nsldata.lock);
 	return 0;
 }
 
