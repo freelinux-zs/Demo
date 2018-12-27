@@ -1,0 +1,42 @@
+sudo gedit  /etc/udev/rules.d/53-android.rules
+这个文件是用于adb调试的，在打开的文件中增加以下文本：
+SUBSYSTEM=="usb", SYSFS{idVendor}=="0bb4", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}="0bb4", ATTR{idProduct}="0c03", SYMLINK+="android_adb"
+sudo gedit  /etc/udev/rules.d/53-MTKinc.rules
+这个文件是用于下载的，在打开的文件中增加以下文本：
+SUBSYSTEM=="usb", SYSFS{idVendor}=="0e8d", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}="0e8d", ATTR{idProduct}="2000", SYMLINK+="android_adb"
+KERNEL=="ttyACM*", MODE="0666"
+驱动重新加载：
+														sudo chmod a+rx /etc/udev/rules.d/53-android.rules
+														sudo chmod a+rx /etc/udev/rules.d/53-MTKinc.rules
+												        sudo /etc/init.d/udev restart       
+														备注：idVendor 与 idProduct的通过lsusb命令查看
+														KERNEL=="ttyACM*", MODE="0666"是给flash_tool运行过程中生成的设备文件增加权限，这样不需要管理员权限即可运行。
+
+														使用MTK下载工具（驱动程序已安装）无法下载的，可使用如下方法（Ubuntu14.04以上）：
+														sudo apt-get remove modemmanager
+														sudo /etc/init.d/udev restart
+
+
+														配置环境变量：
+
+														gedit ~/.bashrc
+
+														export FLASH_PATH=/opt/Flash_Tool
+														export PATH=$FLASH_PATH:$PATH
+
+														alias download='flash_tool.sh'
+
+
+														在终端直接输入download即可调出flash tools
+
+														--------------------- 
+
+														作者：wyw-go 
+
+														来源：CSDN 
+
+														原文：https://blog.csdn.net/yangfan1571397878/article/details/80969491 
+
+														版权声明：本文为博主原创文章，转载请附上博文链接！
